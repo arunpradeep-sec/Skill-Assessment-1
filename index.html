@@ -1,103 +1,3 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>SA Mark Normalizer</title>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-
-<style>
-body{
-    font-family:Arial;
-    max-width:900px;
-    margin:auto;
-    padding:20px;
-}
-
-.box{
-    border:1px solid #ccc;
-    border-radius:8px;
-    padding:15px;
-    margin-bottom:15px;
-}
-
-button{
-    padding:10px 20px;
-    font-size:16px;
-    cursor:pointer;
-}
-
-h2{
-    text-align:center;
-}
-</style>
-</head>
-
-<body>
-
-<h2>SA Mark Normalizer</h2>
-
-<p style="
-text-align:center;
-font-style:italic;
-font-size:12px;
-color:#666;
-">
-Normalizes marks from 50 to 20 and generates the final template
-</p>
-
-<div class="box">
-
-<b>Input Marks File</b>
-
-<br><br>
-
-<input type="file"
-       id="inputFile"
-       accept=".xlsx,.xls">
-
-<div style="
-margin-top:12px;
-padding:8px;
-background:#f5f5f5;
-border-left:4px solid #999;
-font-size:13px;
-color:#555;
-font-style:italic;
-">
-Note: Register Number must be in Column C and Question marks in Columns G to K.
-</div>
-
-</div>
-
-<div class="box">
-
-<b>Output Template</b>
-
-<br><br>
-
-<input type="file"
-       id="templateFile"
-       accept=".xlsx,.xls">
-
-<div style="
-margin-top:12px;
-padding:8px;
-background:#f5f5f5;
-border-left:4px solid #999;
-font-size:13px;
-color:#555;
-font-style:italic;
-">
-Note: Upload the SA output template.
-</div>
-
-</div>
-
-<button onclick="generateOutput()">
-Generate Output
-</button>
-
 <script>
 
 function cleanId(value){
@@ -108,6 +8,13 @@ function cleanId(value){
     return String(value)
         .replace(".0","")
         .trim();
+}
+
+function safeMark(value){
+
+    const num=parseFloat(value);
+
+    return isNaN(num) ? 0 : num;
 }
 
 function readFile(file){
@@ -127,10 +34,10 @@ function readFile(file){
 
 async function generateOutput(){
 
-    const inputFile =
+    const inputFile=
         document.getElementById("inputFile").files[0];
 
-    const templateFile =
+    const templateFile=
         document.getElementById("templateFile").files[0];
 
     if(!inputFile || !templateFile){
@@ -139,13 +46,17 @@ async function generateOutput(){
         return;
     }
 
-    const inputWB =
-        XLSX.read(await readFile(inputFile));
+    const inputWB=
+        XLSX.read(
+            await readFile(inputFile)
+        );
 
-    const templateBuffer =
-        await readFile(templateFile);
+    const templateWB=
+        XLSX.read(
+            await readFile(templateFile)
+        );
 
-    const inputRows =
+    const inputSheet=
         XLSX.utils.sheet_to_json(
             inputWB.Sheets[
                 inputWB.SheetNames[0]
@@ -153,11 +64,11 @@ async function generateOutput(){
             {header:1}
         );
 
-    const inputMap = {};
+    const inputMap={};
 
-    for(let r=1;r<inputRows.length;r++){
+    for(let r=1;r<inputSheet.length;r++){
 
-        const row=inputRows[r];
+        const row=inputSheet[r];
 
         const regNo=
             cleanId(row[2]); // C
@@ -167,23 +78,20 @@ async function generateOutput(){
 
         inputMap[regNo]={
 
-            q1: Number(row[6] || 0) * 0.4,
-            q2: Number(row[7] || 0) * 0.4,
-            q3: Number(row[8] || 0) * 0.4,
-            q4: Number(row[9] || 0) * 0.4,
-            q5: Number(row[10] || 0) * 0.4
+            q1: safeMark(row[6]) * 0.4,
+            q2: safeMark(row[7]) * 0.4,
+            q3: safeMark(row[8]) * 0.4,
+            q4: safeMark(row[9]) * 0.4,
+            q5: safeMark(row[10]) * 0.4
         };
     }
 
-    const wb =
-        XLSX.read(templateBuffer);
-
-    const sheet =
-        wb.Sheets[
-            wb.SheetNames[0]
+    const sheet=
+        templateWB.Sheets[
+            templateWB.SheetNames[0]
         ];
 
-    const rows =
+    const rows=
         XLSX.utils.sheet_to_json(
             sheet,
             {header:1}
@@ -191,16 +99,13 @@ async function generateOutput(){
 
     for(let r=4;r<rows.length;r++){
 
-        const row=rows[r];
-
         const regNo=
-            cleanId(row[0]); // A
+            cleanId(
+                rows[r][0]
+            );
 
         if(!regNo)
             break;
-
-        const data=
-            inputMap[regNo];
 
         let q1=0;
         let q2=0;
@@ -208,36 +113,66 @@ async function generateOutput(){
         let q4=0;
         let q5=0;
 
-        if(data){
+        if(inputMap[regNo]){
 
-            q1=data.q1;
-            q2=data.q2;
-            q3=data.q3;
-            q4=data.q4;
-            q5=data.q5;
+            q1=inputMap[regNo].q1;
+            q2=inputMap[regNo].q2;
+            q3=inputMap[regNo].q3;
+            q4=inputMap[regNo].q4;
+            q5=inputMap[regNo].q5;
         }
 
         const total=
             q1+q2+q3+q4+q5;
 
-        sheet["G"+(r+1)]={t:"n",v:Math.round(q1*100)/100};
-        sheet["H"+(r+1)]={t:"n",v:Math.round(q2*100)/100};
-        sheet["I"+(r+1)]={t:"n",v:Math.round(q3*100)/100};
-        sheet["J"+(r+1)]={t:"n",v:Math.round(q4*100)/100};
-        sheet["K"+(r+1)]={t:"n",v:Math.round(q5*100)/100};
+        const excelRow=r+1;
 
-        sheet["F"+(r+1)]={t:"n",v:Math.round(total*100)/100};
+        const values={
+
+            F: total,
+            G: q1,
+            H: q2,
+            I: q3,
+            J: q4,
+            K: q5
+        };
+
+        Object.keys(values).forEach(col=>{
+
+            const cell=
+                col + excelRow;
+
+            const value=
+                Math.round(
+                    values[col] * 100
+                ) / 100;
+
+            if(sheet[cell]){
+
+                sheet[cell].v=value;
+                sheet[cell].t="n";
+
+            }else{
+
+                sheet[cell]={
+
+                    t:"n",
+                    v:value
+                };
+            }
+
+        });
+
     }
 
     XLSX.writeFile(
-        wb,
+        templateWB,
         "Final_SA_Marks.xlsx"
     );
 
-    alert("Output generated successfully.");
+    alert(
+        "Output generated successfully."
+    );
 }
 
 </script>
-
-</body>
-</html>
