@@ -1,3 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>SA Mark Normalizer</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+body{
+    font-family:Arial,sans-serif;
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
+
+.box{
+    border:1px solid #ccc;
+    border-radius:8px;
+    padding:15px;
+    margin-bottom:20px;
+}
+
+button{
+    padding:12px 25px;
+    font-size:16px;
+    cursor:pointer;
+}
+
+.note{
+    margin-top:12px;
+    padding:8px;
+    background:#f5f5f5;
+    border-left:4px solid #999;
+    font-size:13px;
+    color:#555;
+    font-style:italic;
+}
+
+h1{
+    margin-bottom:5px;
+}
+
+.subtitle{
+    color:#666;
+    font-style:italic;
+    margin-bottom:25px;
+}
+</style>
+</head>
+
+<body>
+
+<h1>Skill Assessment Mark Normalizer</h1>
+<div class="subtitle">
+Normalizes marks from 50 to 20 and generates the CAMU Ready template
+</div>
+
+<div class="box">
+
+<b>Input Marks File</b>
+
+<br><br>
+
+<input type="file"
+       id="inputFile"
+       accept=".xlsx,.xls">
+
+<div class="note">
+Upload template downloaded from lms (All participants). 
+</div>
+
+</div>
+
+<div class="box">
+
+<b>Output Template</b>
+
+<br><br>
+
+<input type="file"
+       id="templateFile"
+       accept=".xlsx,.xls">
+
+<div class="note">
+Upload template for your slot downloaded from CAMU. Put 'Y' for absentees.
+</div>
+
+</div>
+
+<button onclick="generateOutput()">
+Generate Output
+</button>
+
 <script>
 
 function cleanId(value){
@@ -6,15 +100,15 @@ function cleanId(value){
         return "";
 
     return String(value)
-        .replace(".0","")
-        .trim();
+            .replace(".0","")
+            .trim();
 }
 
-function safeMark(value){
+function safeNumber(value){
 
-    const num=parseFloat(value);
+    const n=parseFloat(value);
 
-    return isNaN(num) ? 0 : num;
+    return isNaN(n) ? 0 : n;
 }
 
 function readFile(file){
@@ -34,145 +128,167 @@ function readFile(file){
 
 async function generateOutput(){
 
-    const inputFile=
-        document.getElementById("inputFile").files[0];
+    try{
 
-    const templateFile=
-        document.getElementById("templateFile").files[0];
+        const inputFile=
+            document.getElementById("inputFile").files[0];
 
-    if(!inputFile || !templateFile){
+        const templateFile=
+            document.getElementById("templateFile").files[0];
 
-        alert("Please upload both files.");
-        return;
-    }
+        if(!inputFile || !templateFile){
 
-    const inputWB=
-        XLSX.read(
-            await readFile(inputFile)
-        );
-
-    const templateWB=
-        XLSX.read(
-            await readFile(templateFile)
-        );
-
-    const inputSheet=
-        XLSX.utils.sheet_to_json(
-            inputWB.Sheets[
-                inputWB.SheetNames[0]
-            ],
-            {header:1}
-        );
-
-    const inputMap={};
-
-    for(let r=1;r<inputSheet.length;r++){
-
-        const row=inputSheet[r];
-
-        const regNo=
-            cleanId(row[2]); // C
-
-        if(!regNo)
-            continue;
-
-        inputMap[regNo]={
-
-            q1: safeMark(row[6]) * 0.4,
-            q2: safeMark(row[7]) * 0.4,
-            q3: safeMark(row[8]) * 0.4,
-            q4: safeMark(row[9]) * 0.4,
-            q5: safeMark(row[10]) * 0.4
-        };
-    }
-
-    const sheet=
-        templateWB.Sheets[
-            templateWB.SheetNames[0]
-        ];
-
-    const rows=
-        XLSX.utils.sheet_to_json(
-            sheet,
-            {header:1}
-        );
-
-    for(let r=4;r<rows.length;r++){
-
-        const regNo=
-            cleanId(
-                rows[r][0]
-            );
-
-        if(!regNo)
-            break;
-
-        let q1=0;
-        let q2=0;
-        let q3=0;
-        let q4=0;
-        let q5=0;
-
-        if(inputMap[regNo]){
-
-            q1=inputMap[regNo].q1;
-            q2=inputMap[regNo].q2;
-            q3=inputMap[regNo].q3;
-            q4=inputMap[regNo].q4;
-            q5=inputMap[regNo].q5;
+            alert("Please upload both files.");
+            return;
         }
 
-        const total=
-            q1+q2+q3+q4+q5;
+        const inputWB=
+            XLSX.read(
+                await readFile(inputFile)
+            );
 
-        const excelRow=r+1;
+        const templateWB=
+            XLSX.read(
+                await readFile(templateFile)
+            );
 
-        const values={
+        const inputRows=
+            XLSX.utils.sheet_to_json(
+                inputWB.Sheets[
+                    inputWB.SheetNames[0]
+                ],
+                {header:1}
+            );
 
-            F: total,
-            G: q1,
-            H: q2,
-            I: q3,
-            J: q4,
-            K: q5
-        };
+        const markMap={};
 
-        Object.keys(values).forEach(col=>{
+        for(let r=1;r<inputRows.length;r++){
 
-            const cell=
-                col + excelRow;
+            const row=inputRows[r];
 
-            const value=
-                Math.round(
-                    values[col] * 100
-                ) / 100;
+            const regNo=
+                cleanId(row[2]); // Column C
 
-            if(sheet[cell]){
+            if(!regNo)
+                continue;
 
-                sheet[cell].v=value;
-                sheet[cell].t="n";
+            markMap[regNo]={
 
-            }else{
+                q1: safeNumber(row[6]) * 0.4,
+                q2: safeNumber(row[7]) * 0.4,
+                q3: safeNumber(row[8]) * 0.4,
+                q4: safeNumber(row[9]) * 0.4,
+                q5: safeNumber(row[10]) * 0.4
+            };
+        }
 
-                sheet[cell]={
+        const sheet=
+            templateWB.Sheets[
+                templateWB.SheetNames[0]
+            ];
 
-                    t:"n",
-                    v:value
-                };
+        const rows=
+            XLSX.utils.sheet_to_json(
+                sheet,
+                {header:1}
+            );
+
+        for(let r=4;r<rows.length;r++){
+
+            const regNo=
+                cleanId(
+                    rows[r][0]
+                );
+
+            if(!regNo)
+                break;
+
+            let q1=0;
+            let q2=0;
+            let q3=0;
+            let q4=0;
+            let q5=0;
+
+            if(markMap[regNo]){
+
+                q1=markMap[regNo].q1;
+                q2=markMap[regNo].q2;
+                q3=markMap[regNo].q3;
+                q4=markMap[regNo].q4;
+                q5=markMap[regNo].q5;
             }
 
-        });
+            const total=
+                q1+q2+q3+q4+q5;
+
+            const excelRow=r+1;
+
+            const values={
+
+                F:total,
+                G:q1,
+                H:q2,
+                I:q3,
+                J:q4,
+                K:q5
+            };
+
+            Object.keys(values).forEach(col=>{
+
+                const cell=col+excelRow;
+
+                const value=
+                    Math.round(
+                        values[col]*100
+                    )/100;
+
+                if(sheet[cell]){
+
+                    sheet[cell].v=value;
+                    sheet[cell].t="n";
+
+                }else{
+
+                    sheet[cell]={
+                        t:"n",
+                        v:value
+                    };
+                }
+
+            });
+        }
+
+        XLSX.writeFile(
+            templateWB,
+            "Final_SA_Marks.xlsx"
+        );
+
+        alert("Output generated successfully.");
 
     }
+    catch(err){
 
-    XLSX.writeFile(
-        templateWB,
-        "Final_SA_Marks.xlsx"
-    );
+        console.error(err);
 
-    alert(
-        "Output generated successfully."
-    );
+        alert(
+            "Error: " +
+            err.message
+        );
+    }
 }
 
 </script>
+<footer style="
+    margin-top:50px;
+    display:flex;
+    justify-content:center;
+    gap:40px;
+    align-items:center;
+">
+
+    <img src="logo1.jpg" height="70">
+    <img src="logo2.png" height="70">
+    <!-- <img src="logo3.jpg" height="70"> -->
+</footer>
+</body>
+</html>
