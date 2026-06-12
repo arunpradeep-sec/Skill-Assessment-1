@@ -120,17 +120,6 @@ All values are rounded to 2 decimal places.
 
 ---
 
-## Technology Used
-
-- HTML5
-- JavaScript
-- SheetJS (XLSX)
-
-Library:
-
-https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js
-
----
 
 ## Notes
 
